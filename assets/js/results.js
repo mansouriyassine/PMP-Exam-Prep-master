@@ -46,6 +46,10 @@ function displayResults() {
             `;
             questionReview.innerHTML += reviewHtml;
         });
+    }).catch(error => {
+        console.error('Error fetching questions:', error);
+        const questionReview = document.getElementById('question-review');
+        questionReview.innerHTML = `<p>Error loading questions. Please try again later.</p>`;
     });
 }
 
@@ -67,7 +71,8 @@ function fetchQuestions(group) {
             })
             .catch(error => {
                 console.error('Error fetching questions:', error);
-                document.getElementById('question-review').innerHTML = `<p>Error loading questions: ${error.message}. Please try again.</p>`;
+                const questionReview = document.getElementById('question-review');
+                questionReview.innerHTML = `<p>Error loading questions: ${error.message}. Please try again.</p>`;
                 return [];
             });
     }
