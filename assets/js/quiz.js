@@ -1,136 +1,121 @@
+// Quiz state
 let questions = [];
 let currentQuestionIndex = 0;
-let userAnswers = [];
+let selectedAnswers = [];
+let timer;
 let timeLeft = 600; // 10 minutes in seconds
-let timerInterval;
 
-function getUrlParameter(name) {
-    name = name.replace(/[[]/, '\\[').replace(/[\]]/, '\\]');
-    let regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    let results = regex.exec(location.search);
-    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+// DOM elements
+const quizContainer = document.getElementById('quiz-container');
+const questionProgress = document.getElementById('question-progress');
+const timerElement = document.getElementById('timer');
+const progressBar = document.getElementById('progress-bar');
+const questionElement = document.getElementById('question');
+const choicesElement = document.getElementById('choices');
+const prevBtn = document.getElementById('prev-btn');
+const nextBtn = document.getElementById('next-btn');
+
+// Fetch questions from API or use a predefined set
+function fetchQuestions() {
+    // For now, let's use a sample set of questions
+    questions = [
+        {
+            question: "What is the primary goal of project management?",
+            choices: ["Maximize profit", "Complete the project on time and within budget", "Hire more employees", "Reduce workload"],
+            correctAnswer: "Complete the project on time and within budget"
+        },
+        {
+            question: "Which process group is responsible for authorizing the project or phase?",
+            choices: ["Initiating", "Planning", "Executing", "Monitoring and Controlling"],
+            correctAnswer: "Initiating"
+        },
+        // Add more questions as needed
+    ];
+    renderQuestion();
 }
 
-function fetchQuestions(group) {
-    return fetch(`questions/group${group}.json`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!Array.isArray(data) || data.length === 0) {
-                throw new Error('Invalid or empty question data');
-            }
-            questions = data;
-            startQuiz();
-        })
-        .catch(error => {
-            console.error('Error fetching questions:', error);
-            document.getElementById('quiz-container').innerHTML = `<p>Error loading questions: ${error.message}. Please try again.</p>`;
-        });
-}
-
-function startQuiz() {
-    userAnswers = new Array(questions.length).fill(null);
-    showQuestion(questions[currentQuestionIndex]);
-    startTimer();
-}
-
-function showQuestion(question) {
-    document.getElementById('question').textContent = question.question;
-    const choicesContainer = document.getElementById('choices');
-    choicesContainer.innerHTML = '';
-    const choices = [question.choice1, question.choice2, question.choice3, question.choice4];
-    choices.forEach((choice, index) => {
+function renderQuestion() {
+    const question = questions[currentQuestionIndex];
+    questionProgress.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+    questionElement.textContent = question.question;
+    choicesElement.innerHTML = '';
+    question.choices.forEach((choice, index) => {
         const button = document.createElement('button');
-        button.className = 'w-full text-left px-4 py-2 border rounded mb-2 hover:bg-gray-100';
         button.textContent = choice;
-        button.onclick = () => selectAnswer(index);
-        if (userAnswers[currentQuestionIndex] === index + 1) {
-            button.classList.add('bg-green-300');
+        button.classList.add('w-full', 'p-4', 'text-left', 'border', 'rounded', 'mb-2', 'hover:bg-gray-100');
+        if (selectedAnswers[currentQuestionIndex] === choice) {
+            button.classList.add('bg-blue-100');
         }
-        choicesContainer.appendChild(button);
+        button.addEventListener('click', () => selectAnswer(choice));
+        choicesElement.appendChild(button);
     });
-    updateNavigationButtons();
+    updateNavButtons();
     updateProgressBar();
 }
 
-function selectAnswer(selectedIndex) {
-    const choicesContainer = document.getElementById('choices');
-    const choiceButtons = choicesContainer.getElementsByTagName('button');
-    Array.from(choiceButtons).forEach(button => {
-        button.classList.remove('bg-green-300');
-    });
-
-    choiceButtons[selectedIndex].classList.add('bg-green-300');
-
-    userAnswers[currentQuestionIndex] = selectedIndex + 1;
-    updateNavigationButtons();
+function selectAnswer(answer) {
+    selectedAnswers[currentQuestionIndex] = answer;
+    renderQuestion();
 }
 
-function updateNavigationButtons() {
-    document.getElementById('prev-btn').disabled = currentQuestionIndex === 0;
-    const nextBtn = document.getElementById('next-btn');
-    if (currentQuestionIndex === questions.length - 1) {
-        nextBtn.textContent = 'Finish';
-        nextBtn.onclick = finishQuiz;
-    } else {
-        nextBtn.textContent = 'Next';
-        nextBtn.onclick = () => {
-            currentQuestionIndex++;
-            showQuestion(questions[currentQuestionIndex]);
-        };
-    }
+function updateNavButtons() {
+    prevBtn.disabled = currentQuestionIndex === 0;
+    nextBtn.textContent = currentQuestionIndex === questions.length - 1 ? 'Finish' : 'Next';
 }
 
 function updateProgressBar() {
     const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-    document.getElementById('progress-bar').style.width = `${progress}%`;
-    document.getElementById('question-progress').textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+    progressBar.style.width = `${progress}%`;
 }
 
-function startTimer() {
-    const timerElement = document.getElementById('timer');
-    timerInterval = setInterval(() => {
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            finishQuiz();
-        } else {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            timeLeft--;
-        }
-    }, 1000);
+function nextQuestion() {
+    if (currentQuestionIndex < questions.length - 1) {
+        currentQuestionIndex++;
+        renderQuestion();
+    } else {
+        finishQuiz();
+    }
+}
+
+function previousQuestion() {
+    if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        renderQuestion();
+    }
 }
 
 function finishQuiz() {
-    clearInterval(timerInterval);
+    clearInterval(timer);
+    // Calculate score and redirect to results page
     const score = calculateScore();
-    const timeTaken = 600 - timeLeft;
-    window.location.href = `results.html?score=${score}&total=${questions.length}&time=${timeTaken}&answers=${JSON.stringify(userAnswers)}`;
+    window.location.href = `results.html?score=${score}`;
 }
 
 function calculateScore() {
-    return userAnswers.reduce((score, answer, index) => {
-        return score + (answer === questions[index].answer ? 1 : 0);
-    }, 0);
+    let correctAnswers = 0;
+    questions.forEach((question, index) => {
+        if (selectedAnswers[index] === question.correctAnswer) {
+            correctAnswers++;
+        }
+    });
+    return (correctAnswers / questions.length) * 100;
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const selectedGroup = getUrlParameter('group');
-    if (selectedGroup) {
-        fetchQuestions(selectedGroup);
+function updateTimer() {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    if (timeLeft === 0) {
+        finishQuiz();
     } else {
-        document.getElementById('quiz-container').innerHTML = `<p>No group selected. Please go back and choose a group.</p>`;
+        timeLeft--;
     }
-});
+}
 
-document.getElementById('prev-btn').onclick = () => {
-    if (currentQuestionIndex > 0) {
-        currentQuestionIndex--;
-        showQuestion(questions[currentQuestionIndex]);
-    }
-};
+// Event listeners
+nextBtn.addEventListener('click', nextQuestion);
+prevBtn.addEventListener('click', previousQuestion);
+
+// Initialize quiz
+fetchQuestions();
+timer = setInterval(updateTimer, 1000);
