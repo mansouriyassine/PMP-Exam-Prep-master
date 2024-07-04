@@ -18,18 +18,36 @@ async function fetchQuestions() {
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        questions = await response.json();
+        const data = await response.json();
+        if (!Array.isArray(data) || data.length === 0) {
+            throw new Error('Invalid or empty question data');
+        }
+        questions = data;
         renderQuestion();
     } catch (error) {
         console.error("Could not fetch questions:", error);
-        questionElement.textContent = "Error loading questions. Please try again later.";
+        displayError("Error loading questions. Please try again later.");
     }
 }
 
+function displayError(message) {
+    questionElement.textContent = message;
+    choicesElement.innerHTML = '';
+    nextButton.style.display = 'none';
+}
+
 function renderQuestion() {
-    if (questions.length === 0) return;
+    if (!Array.isArray(questions) || questions.length === 0) {
+        displayError("No questions available.");
+        return;
+    }
 
     const question = questions[currentQuestionIndex];
+    if (!question || typeof question.question !== 'string' || !Array.isArray(question.choices)) {
+        displayError("Invalid question format.");
+        return;
+    }
+
     questionElement.textContent = `Question ${currentQuestionIndex + 1}: ${question.question}`;
     choicesElement.innerHTML = '';
     question.choices.forEach((choice, index) => {
@@ -71,7 +89,7 @@ function finishQuiz() {
     // Calculate score
     const score = calculateScore();
     
-    // Store results in localStorage (as we can't use React Router for navigation)
+    // Store results in localStorage
     localStorage.setItem('quizResults', JSON.stringify({
         selectedAnswers,
         questions,
