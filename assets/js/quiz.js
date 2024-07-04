@@ -19,43 +19,57 @@ async function fetchQuestions() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        if (!Array.isArray(data) || data.length === 0) {
-            throw new Error('Invalid or empty question data');
+        questions = parseQuestions(data);
+        if (questions.length === 0) {
+            throw new Error('No valid questions found in the data');
         }
-        questions = data;
         renderQuestion();
     } catch (error) {
-        console.error("Could not fetch questions:", error);
-        displayError("Error loading questions. Please try again later.");
+        console.error("Could not fetch or parse questions:", error);
+        displayError(`Error: ${error.message}. Please check the console for more details.`);
     }
 }
 
+function parseQuestions(data) {
+    return data.map(q => ({
+        question: q.question,
+        choices: [q.choice1, q.choice2, q.choice3, q.choice4],
+        correctAnswer: q.answer - 1 // Convert 1-based to 0-based index
+    })).filter(q => isValidQuestion(q));
+}
+
+function isValidQuestion(q) {
+    return q && 
+           typeof q.question === 'string' && 
+           Array.isArray(q.choices) && 
+           q.choices.length === 4 &&
+           typeof q.correctAnswer === 'number' &&
+           q.correctAnswer >= 0 && 
+           q.correctAnswer < 4;
+}
+
 function displayError(message) {
+    console.error(message);
     questionElement.textContent = message;
     choicesElement.innerHTML = '';
     nextButton.style.display = 'none';
 }
 
 function renderQuestion() {
-    if (!Array.isArray(questions) || questions.length === 0) {
-        displayError("No questions available.");
+    if (questions.length === 0 || currentQuestionIndex >= questions.length) {
+        displayError("No more questions available.");
         return;
     }
 
     const question = questions[currentQuestionIndex];
-    if (!question || typeof question.question !== 'string' || !Array.isArray(question.choices)) {
-        displayError("Invalid question format.");
-        return;
-    }
-
     questionElement.textContent = `Question ${currentQuestionIndex + 1}: ${question.question}`;
     choicesElement.innerHTML = '';
     question.choices.forEach((choice, index) => {
         const button = document.createElement('button');
         button.textContent = choice;
         button.classList.add('choice-btn');
-        button.addEventListener('click', () => handleAnswerClick(choice));
-        if (isAnswered && selectedAnswers[currentQuestionIndex] === choice) {
+        button.addEventListener('click', () => handleAnswerClick(index));
+        if (isAnswered && selectedAnswers[currentQuestionIndex] === index) {
             button.style.backgroundColor = 'gray';
         }
         if (isAnswered) {
@@ -67,9 +81,9 @@ function renderQuestion() {
     nextButton.style.display = isAnswered ? 'block' : 'none';
 }
 
-function handleAnswerClick(answer) {
+function handleAnswerClick(answerIndex) {
     if (!isAnswered) {
-        selectedAnswers[currentQuestionIndex] = answer;
+        selectedAnswers[currentQuestionIndex] = answerIndex;
         isAnswered = true;
         renderQuestion();
     }
@@ -86,17 +100,12 @@ function handleNextClick() {
 }
 
 function finishQuiz() {
-    // Calculate score
     const score = calculateScore();
-    
-    // Store results in localStorage
     localStorage.setItem('quizResults', JSON.stringify({
         selectedAnswers,
         questions,
         score
     }));
-
-    // Redirect to results page
     window.location.href = 'results.html';
 }
 
