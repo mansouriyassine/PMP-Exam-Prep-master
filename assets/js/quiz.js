@@ -15,26 +15,29 @@ const choicesElement = document.getElementById('choices');
 const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 
-// Fetch questions from API or use a predefined set
-function fetchQuestions() {
-    // For now, let's use a sample set of questions
-    questions = [
-        {
-            question: "What is the primary goal of project management?",
-            choices: ["Maximize profit", "Complete the project on time and within budget", "Hire more employees", "Reduce workload"],
-            correctAnswer: "Complete the project on time and within budget"
-        },
-        {
-            question: "Which process group is responsible for authorizing the project or phase?",
-            choices: ["Initiating", "Planning", "Executing", "Monitoring and Controlling"],
-            correctAnswer: "Initiating"
-        },
-        // Add more questions as needed
-    ];
-    renderQuestion();
+// Get the group number from URL parameters
+const urlParams = new URLSearchParams(window.location.search);
+const groupNumber = urlParams.get('group') || '1'; // Default to group 1 if not specified
+
+// Fetch questions from JSON file
+async function fetchQuestions() {
+    try {
+        const response = await fetch(`questions/group${groupNumber}.json`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        questions = await response.json();
+        renderQuestion();
+        startTimer();
+    } catch (error) {
+        console.error("Could not fetch questions:", error);
+        questionElement.textContent = "Error loading questions. Please try again later.";
+    }
 }
 
 function renderQuestion() {
+    if (questions.length === 0) return;
+
     const question = questions[currentQuestionIndex];
     questionProgress.textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
     questionElement.textContent = question.question;
@@ -88,7 +91,7 @@ function finishQuiz() {
     clearInterval(timer);
     // Calculate score and redirect to results page
     const score = calculateScore();
-    window.location.href = `results.html?score=${score}`;
+    window.location.href = `results.html?score=${score}&group=${groupNumber}`;
 }
 
 function calculateScore() {
@@ -112,10 +115,13 @@ function updateTimer() {
     }
 }
 
+function startTimer() {
+    timer = setInterval(updateTimer, 1000);
+}
+
 // Event listeners
 nextBtn.addEventListener('click', nextQuestion);
 prevBtn.addEventListener('click', previousQuestion);
 
 // Initialize quiz
 fetchQuestions();
-timer = setInterval(updateTimer, 1000);
